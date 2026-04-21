@@ -70,8 +70,6 @@ def create_ssl_context() -> ssl.SSLContext:
     )
     return ctx
 
-
-# ══════════════════════════════════════════════════════════════
 def recv_all(sock: ssl.SSLSocket, n: int) -> bytes:
     """Reçoit exactement n octets depuis le socket."""
     data = b""

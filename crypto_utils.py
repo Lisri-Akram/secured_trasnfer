@@ -1,6 +1,5 @@
 """
-crypto_utils.py — Utilitaires de chiffrement via OpenSSL
-=========================================================
+Utilitaires de chiffrement via OpenSSL
 Protocole d'échange sécurisé :
   1. Générer une clé AES-256 aléatoire (clé de session)
   2. Chiffrer le fichier avec AES-256-CBC + IV aléatoire
@@ -277,7 +276,6 @@ def unpack_secure_packet(data: bytes) -> dict:
         "enc_file":  enc_file,
         "original_hash": original_hash
     }
-
 
 def sha256_file(path: str) -> bytes:
     """Calcule le hash SHA-256 d'un fichier."""

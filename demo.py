@@ -1,6 +1,5 @@
 """
-demo.py — Démonstration complète (sans réseau)
-===============================================
+ Démonstration complète (sans réseau)
 Simule l'échange sécurisé complet côté expéditeur et destinataire,
 en local, pour valider toutes les étapes cryptographiques.
 """

@@ -1,5 +1,5 @@
 """
-client.py — Client d'échange de fichiers sécurisé
+Client d'échange de fichiers sécurisé
 Protocole :
   1. Connexion TLS avec certificat client (mTLS)
   2. Chiffrement AES-256-CBC du fichier à envoyer
