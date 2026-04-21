@@ -1,0 +1,6 @@
+#generated runtime folders
+pki/
+received_files/
+
+# Python cache
+__pycache__/
