@@ -55,4 +55,8 @@ python demo.py
 
 Les fichiers recus sont enregistres dans le dossier `received_files/`.
 
+## Licence
+
+Ce projet est sous licence MIT. Voir le fichier `LICENSE`.
+
 
