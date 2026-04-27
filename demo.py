@@ -1,223 +1,130 @@
 """
- Démonstration complète (sans réseau)
-Simule l'échange sécurisé complet côté expéditeur et destinataire,
-en local, pour valider toutes les étapes cryptographiques.
+demo.py
+Démonstration complète en local (sans réseau).
+Simule l'envoi et la réception d'un fichier chiffré.
+
+Utilisation : python demo.py
 """
 
 import os
 import sys
 import tempfile
 import shutil
-import subprocess
-import hashlib
-from pathlib import Path
 
-sys.path.insert(0, os.path.dirname(__file__))
 from crypto_utils import (
-    aes_encrypt_file, aes_decrypt_file,
-    rsa_encrypt_key, rsa_decrypt_key,
-    sign_file, verify_signature,
-    verify_certificate, get_cert_info,
-    pack_secure_packet, unpack_secure_packet,
-    sha256_file
+    chiffrer_fichier_aes, dechiffrer_fichier_aes,
+    chiffrer_cle_rsa,    dechiffrer_cle_rsa,
+    hash_sha256
 )
 
-PKI_DIR = Path("./pki")
-OK  = "  \033[32m✔\033[0m"
-ERR = "  \033[31m✘\033[0m"
-HDR = "\033[1m\033[36m"
-RST = "\033[0m"
 
-
-def section(title: str):
-    print(f"\n{HDR}{'═'*54}{RST}")
-    print(f"{HDR}  {title}{RST}")
-    print(f"{HDR}{'═'*54}{RST}")
-
-
-def check_pki():
-    """Vérifie que la PKI a été configurée."""
-    required = [
-        PKI_DIR / "ca"     / "ca.crt",
-        PKI_DIR / "server" / "server.crt",
-        PKI_DIR / "server" / "server.key",
-        PKI_DIR / "client" / "client.crt",
-        PKI_DIR / "client" / "client.key",
-        PKI_DIR / "shared" / "server_pub.pem",
-        PKI_DIR / "shared" / "client_pub.pem",
+def verifier_pki():
+    """Vérifie que les fichiers PKI nécessaires existent."""
+    fichiers = [
+        "pki/ca/ca.crt",
+        "pki/server/server.crt",
+        "pki/server/server.key",
+        "pki/server/server_pub.pem",
     ]
-    missing = [str(p) for p in required if not p.exists()]
-    if missing:
-        print(f"{ERR} PKI manquante. Exécutez d'abord : bash setup_pki.sh")
-        for m in missing:
-            print(f"     manquant : {m}")
+    manquants = [f for f in fichiers if not os.path.exists(f)]
+    if manquants:
+        print("PKI manquante ! Exécutez d'abord : bash setup_pki.sh")
+        for f in manquants:
+            print(f"  manquant : {f}")
         sys.exit(1)
-    print(f"{OK} PKI détectée")
+    print("✔ PKI détectée\n")
 
 
-def demo_certificates():
-    section("ÉTAPE 0 — Vérification des Certificats X.509")
+def main():
+    print("=" * 50)
+    print("  DEMO — Échange de Fichiers Sécurisé")
+    print("  AES-256 + RSA-OAEP + Certificat X.509")
+    print("=" * 50)
 
-    ca_crt     = str(PKI_DIR / "ca"     / "ca.crt")
-    server_crt = str(PKI_DIR / "server" / "server.crt")
-    client_crt = str(PKI_DIR / "client" / "client.crt")
+    verifier_pki()
 
-    for name, cert_path in [("CA", ca_crt), ("Serveur", server_crt), ("Client", client_crt)]:
-        info = get_cert_info(cert_path)
-        print(f"\n  Certificat {name} :")
-        for k, v in info.items():
-            print(f"    {k:20s} {v}")
+    # Créer un dossier temporaire
+    dossier_tmp = tempfile.mkdtemp()
 
-    sv_ok = verify_certificate(server_crt, ca_crt)
-    cl_ok = verify_certificate(client_crt, ca_crt)
-    print(f"\n{OK} Certificat serveur valide (CA) : {sv_ok}")
-    print(f"{OK} Certificat client  valide (CA) : {cl_ok}")
-
-
-def demo_full_exchange():
-    section("ÉTAPE 1 — Création du fichier test")
-
-    tmp_dir = tempfile.mkdtemp(prefix="demo_")
     try:
-        # Fichier test
-        src_file = os.path.join(tmp_dir, "rapport_confidentiel.txt")
-        with open(src_file, "w") as f:
-            f.write("=== RAPPORT CONFIDENTIEL ===\n")
-            f.write("Université Saad Dahleb — Département Informatique\n\n")
-            f.write("Ce document contient des informations sensibles.\n")
-            f.write("Il doit être transmis de manière sécurisée via :\n")
-            f.write("  • Chiffrement AES-256-CBC (confidentialité)\n")
-            f.write("  • Enveloppe RSA-OAEP (échange de clé sécurisé)\n")
-            f.write("  • Signature RSA-SHA256 (authenticité + intégrité)\n")
-            f.write("  • Certificats X.509 / PKI (identité des parties)\n")
-            f.write("  • TLS 1.2 (canal sécurisé)\n\n")
-            f.write(f"Taille : {os.path.getsize(src_file) if os.path.exists(src_file) else '~500'} octets\n")
+        # ─────────────────────────────────────────────
+        # ÉTAPE 1 : Créer le fichier à envoyer
+        # ─────────────────────────────────────────────
+        print("ETAPE 1 : Création du fichier")
+        fichier_original = os.path.join(dossier_tmp, "message.txt")
+        with open(fichier_original, "w") as f:
+            f.write("Bonjour !\n")
+            f.write("Ceci est un fichier confidentiel.\n")
+            f.write("Université Saad Dahleb — Informatique\n")
 
-        src_size = os.path.getsize(src_file)
-        print(f"{OK} Fichier créé : {os.path.basename(src_file)} ({src_size} octets)")
+        print(f"  Fichier : {os.path.basename(fichier_original)}")
+        print(f"  Taille  : {os.path.getsize(fichier_original)} octets")
 
-        # Hash original
-        orig_hash = sha256_file(src_file)
-        print(f"{OK} SHA-256 original : {orig_hash.hex()}")
+        # ─────────────────────────────────────────────
+        # ÉTAPE 2 : Calculer le hash SHA-256
+        # ─────────────────────────────────────────────
+        print("\nETAPE 2 : Hash SHA-256 du fichier original")
+        hash_original = hash_sha256(fichier_original)
+        print(f"  Hash : {hash_original.hex()}")
 
-        #  CHIFFREMENT AES 
-        section("ÉTAPE 2 — Chiffrement AES-256-CBC (côté CLIENT)")
-        enc_file = os.path.join(tmp_dir, "fichier.aes")
-        aes_key, iv = aes_encrypt_file(src_file, enc_file)
-        enc_size = os.path.getsize(enc_file)
-        print(f"{OK} Fichier chiffré  : {enc_size} octets")
-        print(f"   Clé AES-256 : {aes_key.hex()}")
-        print(f"   IV          : {iv.hex()}")
+        # ─────────────────────────────────────────────
+        # ÉTAPE 3 : Chiffrer le fichier avec AES-256
+        # ─────────────────────────────────────────────
+        print("\nETAPE 3 : Chiffrement AES-256-CBC (côté client)")
+        fichier_chiffre = os.path.join(dossier_tmp, "message.aes")
+        cle, iv = chiffrer_fichier_aes(fichier_original, fichier_chiffre)
+        print(f"  Clé AES : {cle.hex()}")
+        print(f"  IV      : {iv.hex()}")
+        print(f"  Taille fichier chiffré : {os.path.getsize(fichier_chiffre)} octets")
 
-        #ENVELOPPE RSA
-        section("ÉTAPE 3 — Enveloppe RSA-OAEP (chiffrement clé AES)")
-        enc_key_iv = rsa_encrypt_key(
-            aes_key, iv,
-            str(PKI_DIR / "shared" / "server_pub.pem")
-        )
-        print(f"{OK} Clé AES chiffrée avec clé publique RSA du serveur")
-        print(f"   Taille enveloppe : {len(enc_key_iv)} octets")
-        print(f"   Premiers octets  : {enc_key_iv[:16].hex()}...")
+        # ─────────────────────────────────────────────
+        # ÉTAPE 4 : Chiffrer la clé AES avec RSA
+        # ─────────────────────────────────────────────
+        print("\nETAPE 4 : Chiffrement RSA-OAEP de la clé AES (côté client)")
+        cle_chiffree = chiffrer_cle_rsa(cle, iv, "pki/server/server_pub.pem")
+        print(f"  Clé chiffrée : {len(cle_chiffree)} octets")
 
-        #SIGNATURE NUMÉRIQUE
-        section("ÉTAPE 4 — Signature RSA-SHA256 (côté CLIENT)")
-        signature = sign_file(enc_file, str(PKI_DIR / "client" / "client.key"))
-        print(f"{OK} Signature créée avec clé privée client")
-        print(f"   Taille signature : {len(signature)} octets")
+        # ─────────────────────────────────────────────
+        # ÉTAPE 5 : Déchiffrer la clé AES avec RSA
+        # ─────────────────────────────────────────────
+        print("\nETAPE 5 : Déchiffrement RSA-OAEP (côté serveur)")
+        cle_recue, iv_recu = dechiffrer_cle_rsa(cle_chiffree, "pki/server/server.key")
+        print(f"  Clé récupérée : {cle_recue.hex()}")
+        print(f"  Clés identiques : {cle == cle_recue}")
 
-        #ASSEMBLAGE PAQUET SÉCURISÉ
-        section("ÉTAPE 5 — Assemblage du Paquet Sécurisé")
-        with open(enc_file, "rb") as f:
-            enc_bytes = f.read()
+        # ─────────────────────────────────────────────
+        # ÉTAPE 6 : Déchiffrer le fichier avec AES
+        # ─────────────────────────────────────────────
+        print("\nETAPE 6 : Déchiffrement AES-256-CBC (côté serveur)")
+        fichier_recu = os.path.join(dossier_tmp, "message_recu.txt")
+        dechiffrer_fichier_aes(fichier_chiffre, fichier_recu, cle_recue, iv_recu)
+        print(f"  Fichier déchiffré : {os.path.basename(fichier_recu)}")
 
-        packet = pack_secure_packet(
-            enc_bytes, enc_key_iv, signature,
-            orig_hash, os.path.basename(src_file)
-        )
-        print(f"{OK} Paquet assemblé : {len(packet):,} octets")
-        print(f"   Structure : [MAGIC|VER|sig|enc_key_iv|filename|enc_data|sha256]")
-        # CÔTÉ SERVEUR — Réception et déchiffrement
-        
-        section("ÉTAPE 6 — Réception & Vérification (côté SERVEUR)")
+        # ─────────────────────────────────────────────
+        # ÉTAPE 7 : Vérifier l'intégrité SHA-256
+        # ─────────────────────────────────────────────
+        print("\nETAPE 7 : Vérification SHA-256")
+        hash_recu = hash_sha256(fichier_recu)
+        print(f"  Hash original : {hash_original.hex()}")
+        print(f"  Hash reçu     : {hash_recu.hex()}")
+        print(f"  Intégrité OK  : {hash_original == hash_recu}")
 
-        pkt = unpack_secure_packet(packet)
-        print(f"{OK} Paquet désassemblé")
-        print(f"   Fichier    : {pkt['filename']}")
+        # ─────────────────────────────────────────────
+        # Résultat final
+        # ─────────────────────────────────────────────
+        print("\n" + "=" * 50)
+        with open(fichier_original) as f: contenu_original = f.read()
+        with open(fichier_recu)    as f: contenu_recu     = f.read()
 
-        # Vérification signature
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".aes") as tf:
-            tf.write(pkt["enc_file"])
-            tmp_enc = tf.name
-
-        try:
-            sig_ok = verify_signature(
-                tmp_enc, pkt["signature"],
-                str(PKI_DIR / "shared" / "client_pub.pem")
-            )
-            if sig_ok:
-                print(f"{OK} Signature RSA-SHA256 valide — expéditeur authentifié")
-            else:
-                print(f"{ERR} SIGNATURE INVALIDE")
-                return
-
-            # Déchiffrement RSA de la clé AES
-            section("ÉTAPE 7 — Déchiffrement RSA + AES (côté SERVEUR)")
-            dec_aes_key, dec_iv = rsa_decrypt_key(
-                pkt["enc_key_iv"],
-                str(PKI_DIR / "server" / "server.key")
-            )
-            print(f"{OK} Clé AES récupérée via RSA-OAEP")
-            print(f"   Clé AES : {dec_aes_key.hex()}")
-            print(f"   IV      : {dec_iv.hex()}")
-
-            key_match = (dec_aes_key == aes_key) and (dec_iv == iv)
-            print(f"{OK} Clé AES identique à l'originale : {key_match}")
-
-            # Déchiffrement AES
-            out_file = os.path.join(tmp_dir, "REÇU_" + pkt["filename"])
-            aes_decrypt_file(tmp_enc, out_file, dec_aes_key, dec_iv)
-            print(f"{OK} Fichier déchiffré : {os.path.basename(out_file)}")
-
-            # Vérification intégrité
-            recv_hash = sha256_file(out_file)
-            integrity = (recv_hash == pkt["original_hash"])
-            print(f"\n{OK} SHA-256 reçu    : {recv_hash.hex()}")
-            print(f"{OK} SHA-256 original : {pkt['original_hash'].hex()}")
-            print(f"{OK} Intégrité vérifiée : {integrity}")
-
-            # Comparer contenu
-            with open(src_file)  as f: orig_content = f.read()
-            with open(out_file)  as f: recv_content = f.read()
-            content_ok = (orig_content == recv_content)
-
-        finally:
-            os.unlink(tmp_enc)
-
-        section("RÉSULTAT FINAL")
-        print(f"{OK} Chiffrement AES-256-CBC  : OK")
-        print(f"{OK} Enveloppe RSA-OAEP       : OK")
-        print(f"{OK} Signature RSA-SHA256     : OK")
-        print(f"{OK} Vérification certificats : OK")
-        print(f"{OK} Intégrité SHA-256        : OK")
-        print(f"{OK} Contenu identique        : {content_ok}")
-        print(f"\n  Fichier original  : {src_size} octets")
-        print(f"  Fichier chiffré  : {enc_size} octets")
-        print(f"  Paquet complet   : {len(packet):,} octets")
-        print()
-        if content_ok:
-            print(f"\033[1m\033[32m  ✔ ÉCHANGE SÉCURISÉ RÉUSSI \033[0m\n")
+        if contenu_original == contenu_recu:
+            print("  ✔ SUCCÈS — Fichier transmis correctement !")
         else:
-            print(f"\033[1m\033[31m  ✘ Contenu différent — erreur\033[0m\n")
+            print("  ✘ ERREUR — Contenu différent !")
+        print("=" * 50 + "\n")
 
     finally:
-        shutil.rmtree(tmp_dir, ignore_errors=True)
+        shutil.rmtree(dossier_tmp)
 
 
 if __name__ == "__main__":
-    print("\033[1m\033[36m")
-    print("   DÉMONSTRATION — Échange de Fichiers Sécurisé  ")
-    print("   RSA + AES + Certificats X.509 + TLS           ")
-    print("\033[0m")
-    check_pki()
-    demo_certificates()
-    demo_full_exchange()
+    main()
