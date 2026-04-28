@@ -11,7 +11,7 @@ openssl genrsa -out "$PKI_DIR/ca/ca.key" 2048
 MSYS2_ARG_CONV_EXCL='*' openssl req -new -x509 -days 3650 \
     -key "$PKI_DIR/ca/ca.key" \
     -out "$PKI_DIR/ca/ca.crt" \
-    -subj "/C=DZ/ST=Blida/O=Univ Saad Dahleb/CN=SimpleCA"
+    -subj "/C=DZ/ST=Algiers/O=USTHB Computer Science Faculty/CN=SimpleCA"
 echo "  ✔ CA créée (valide 10 ans)"
 
 echo "[2/3] Génération certificat serveur (RSA 2048 bits)..."
@@ -20,7 +20,7 @@ openssl genrsa -out "$PKI_DIR/server/server.key" 2048
 MSYS2_ARG_CONV_EXCL='*' openssl req -new \
     -key "$PKI_DIR/server/server.key" \
     -out "$PKI_DIR/server/server.csr" \
-    -subj "/C=DZ/ST=Blida/O=SecureTransfer/CN=localhost"
+    -subj "/C=DZ/ST=Algiers/O=SecureTransfer/CN=localhost"
 
 cat > "$PKI_DIR/server/ext.cnf" <<EOF
 [v3_req]
