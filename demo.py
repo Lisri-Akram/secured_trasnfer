@@ -55,7 +55,7 @@ def main():
         with open(fichier_original, "w") as f:
             f.write("Bonjour !\n")
             f.write("Ceci est un fichier confidentiel.\n")
-            f.write("Université Saad Dahleb — Informatique\n")
+            f.write("Université USTHB - Département Informatique\n")
 
         print(f"  Fichier : {os.path.basename(fichier_original)}")
         print(f"  Taille  : {os.path.getsize(fichier_original)} octets")
